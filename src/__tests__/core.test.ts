@@ -7,6 +7,7 @@ import {
 import { computeRideStats, estimateRampTestFtp, getActiveBlockAtTime } from '../workouts/engine';
 import { WORKOUT_LIBRARY } from '../workouts/library';
 import { generateTcx } from '../export/tcx';
+import { generateWorkoutsFromPrompt } from '../utils/workoutGenerator';
 
 describe('BLE Parsers', () => {
   it('parses FTMS Indoor Bike Data with speed, cadence, and power', () => {
@@ -99,5 +100,13 @@ describe('Workout Engine & TCX Export', () => {
     });
     expect(estimateRampTestFtp(samples)).toBe(300);
     expect(estimateRampTestFtp(samples.slice(0, 30))).toBeNull();
+  });
+
+  it('parses repeated interval specs like "2 blocks of 30 minute long sweet spot"', () => {
+    const workouts = generateWorkoutsFromPrompt('2 blocks of 30 minute long sweet spot');
+    expect(workouts).toHaveLength(3);
+    // Warmup (8m) + 2x30m (60m) + 5m recovery + 5m cooldown = 78 minutes (4680s)
+    expect(workouts[0].totalDurationSec).toBeGreaterThan(3600);
+    expect(workouts[0].category).toBe('Sweet Spot');
   });
 });

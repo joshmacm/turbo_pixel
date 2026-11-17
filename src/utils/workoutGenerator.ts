@@ -24,6 +24,26 @@ function makeGeneratedWorkout(
   };
 }
 
+interface IntervalSpec {
+  repeats: number;
+  intervalSec: number;
+}
+
+function parseIntervalSpec(prompt: string): IntervalSpec | null {
+  // Matches: "2x30", "2 x 30m", "2 blocks of 30 minute", "3 sets of 10 mins", "6 x 15s"
+  const re =
+    /(\d+)\s*(?:x|×|blocks?\s+of|sets?\s+of|reps?\s+of|intervals?\s+of|efforts?\s+of)\s*(\d+(?:\.\d+)?)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes)?\b/i;
+  const m = prompt.match(re);
+  if (!m) return null;
+
+  const repeats = Math.max(1, Math.min(30, Number(m[1])));
+  const val = Number(m[2]);
+  const unit = (m[3] || 'm').toLowerCase();
+  const isSec = unit.startsWith('s');
+  const intervalSec = Math.max(10, Math.round(isSec ? val : val * 60));
+  return { repeats, intervalSec };
+}
+
 function parseRequestedMinutes(prompt: string): number {
   const hrMatch = prompt.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/i);
   if (hrMatch) {
@@ -52,10 +72,153 @@ function detectFocus(prompt: string): WorkoutCategory {
  * Generates 3 tailored workout options from a natural-language description.
  */
 export function generateWorkoutsFromPrompt(prompt: string): Workout[] {
-  const totalMin = parseRequestedMinutes(prompt);
+  const intervalSpec = parseIntervalSpec(prompt);
   const focus = detectFocus(prompt);
   const isLowCadence = /climb|torque|gravel|cadence|big gear/i.test(prompt);
   const isEasy = /easy|recover|light|tired|fresh legs/i.test(prompt);
+
+  if (intervalSpec) {
+    const { repeats, intervalSec } = intervalSpec;
+    const workLabel =
+      intervalSec >= 60 ? `${Math.round(intervalSec / 60)}m` : `${intervalSec}s`;
+    const restSec =
+      intervalSec >= 1200
+        ? 300
+        : intervalSec >= 300
+        ? 180
+        : intervalSec >= 60
+        ? Math.min(180, intervalSec)
+        : Math.max(30, intervalSec * 2);
+
+    const warmupSec = intervalSec >= 600 ? 480 : 360;
+    const cooldownSec = 300;
+    const wWarmup: Omit<WorkoutBlock, 'id'> = {
+      name: 'Warmup',
+      type: 'warmup',
+      durationSec: warmupSec,
+      startPowerPct: 0.45,
+      endPowerPct: focus === 'Endurance' ? 0.65 : 0.76,
+      cadenceTarget: 90,
+    };
+    const wCooldown: Omit<WorkoutBlock, 'id'> = {
+      name: 'Cooldown',
+      type: 'cooldown',
+      durationSec: cooldownSec,
+      startPowerPct: 0.60,
+      endPowerPct: 0.40,
+      cadenceTarget: 84,
+    };
+
+    const pctByFocus: Record<WorkoutCategory, [number, number]> = {
+      Endurance: [0.68, 0.74],
+      'Sweet Spot': [0.88, 0.92],
+      Threshold: [0.97, 1.0],
+      'VO2 Max': [1.15, 1.20],
+      Sprint: [1.55, 1.75],
+      Custom: [0.88, 0.92],
+    };
+    const [lowPct, highPct] = pctByFocus[focus];
+
+    // Variant 1: Exact steady intervals as requested
+    const v1: Omit<WorkoutBlock, 'id'>[] = [wWarmup];
+    for (let i = 1; i <= repeats; i++) {
+      v1.push({
+        name: `${focus} (${i}/${repeats})`,
+        type: 'steady',
+        durationSec: intervalSec,
+        startPowerPct: lowPct,
+        endPowerPct: lowPct,
+        cadenceTarget: isLowCadence ? 72 : 90,
+      });
+      if (i < repeats) {
+        v1.push({
+          name: 'Recovery',
+          type: 'recovery',
+          durationSec: restSec,
+          startPowerPct: 0.54,
+          endPowerPct: 0.54,
+          cadenceTarget: 85,
+        });
+      }
+    }
+    v1.push(wCooldown);
+
+    // Variant 2: Progressive ramp within each block
+    const v2: Omit<WorkoutBlock, 'id'>[] = [wWarmup];
+    for (let i = 1; i <= repeats; i++) {
+      v2.push({
+        name: `Build ${workLabel} (${i}/${repeats})`,
+        type: 'ramp',
+        durationSec: intervalSec,
+        startPowerPct: lowPct,
+        endPowerPct: highPct,
+        cadenceTarget: isLowCadence ? 70 : 92,
+      });
+      if (i < repeats) {
+        v2.push({
+          name: 'Recovery',
+          type: 'recovery',
+          durationSec: restSec,
+          startPowerPct: 0.54,
+          endPowerPct: 0.54,
+          cadenceTarget: 85,
+        });
+      }
+    }
+    v2.push(wCooldown);
+
+    // Variant 3: Surge finish on each block
+    const v3: Omit<WorkoutBlock, 'id'>[] = [wWarmup];
+    const kickSec = Math.min(60, Math.max(15, Math.round(intervalSec * 0.1)));
+    for (let i = 1; i <= repeats; i++) {
+      if (intervalSec > kickSec + 30) {
+        v3.push({
+          name: `Cruise (${i}/${repeats})`,
+          type: 'steady',
+          durationSec: intervalSec - kickSec,
+          startPowerPct: lowPct,
+          endPowerPct: lowPct,
+          cadenceTarget: 90,
+        });
+        v3.push({
+          name: `Finish Kick (${i}/${repeats})`,
+          type: 'interval',
+          durationSec: kickSec,
+          startPowerPct: Number((highPct + 0.08).toFixed(2)),
+          endPowerPct: Number((highPct + 0.08).toFixed(2)),
+          cadenceTarget: 98,
+        });
+      } else {
+        v3.push({
+          name: `Hard (${i}/${repeats})`,
+          type: 'interval',
+          durationSec: intervalSec,
+          startPowerPct: highPct,
+          endPowerPct: highPct,
+          cadenceTarget: 96,
+        });
+      }
+      if (i < repeats) {
+        v3.push({
+          name: 'Recovery',
+          type: 'recovery',
+          durationSec: restSec,
+          startPowerPct: 0.52,
+          endPowerPct: 0.52,
+          cadenceTarget: 85,
+        });
+      }
+    }
+    v3.push(wCooldown);
+
+    return [
+      makeGeneratedWorkout('1', `${repeats}x${workLabel} ${focus}`, focus, `Steady ${repeats}x${workLabel} at ${Math.round(lowPct * 100)}% FTP with warmup & cooldown.`, v1),
+      makeGeneratedWorkout('2', `${repeats}x${workLabel} Progressive`, focus, `${repeats}x${workLabel} ramping from ${Math.round(lowPct * 100)}% to ${Math.round(highPct * 100)}% FTP.`, v2),
+      makeGeneratedWorkout('3', `${repeats}x${workLabel} + Finish Kick`, focus, `${repeats}x${workLabel} with a sharp finish kick on each block.`, v3),
+    ];
+  }
+
+  const totalMin = parseRequestedMinutes(prompt);
 
   const warmupSec = Math.min(480, Math.max(180, Math.round(totalMin * 0.14) * 60));
   const cooldownSec = Math.min(360, Math.max(180, Math.round(totalMin * 0.1) * 60));
