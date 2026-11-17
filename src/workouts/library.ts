@@ -134,4 +134,33 @@ export const WORKOUT_LIBRARY: Workout[] = [
       { name: 'Cooldown', type: 'cooldown', durationSec: 300, startPowerPct: 0.60, endPowerPct: 0.42, cadenceTarget: 85 },
     ]
   ),
+  makeWorkout(
+    'ftp-ramp-test',
+    'FTP Ramp Test',
+    'Threshold',
+    '5m warmup then +8% FTP every 60s until exhaustion. Estimates FTP as 75% of best 1-min power.',
+    [
+      { name: 'Warmup', type: 'warmup', durationSec: 300, startPowerPct: 0.45, endPowerPct: 0.50, cadenceTarget: 90 },
+      ...Array.from({ length: 16 }, (_, idx) => {
+        const pct = Number((0.52 + idx * 0.08).toFixed(2));
+        return {
+          name: `Step ${idx + 1} (${Math.round(pct * 100)}%)`,
+          type: 'ramp' as const,
+          durationSec: 60,
+          startPowerPct: pct,
+          endPowerPct: pct,
+          cadenceTarget: 90,
+        };
+      }),
+    ]
+  ),
+  makeWorkout(
+    'free-ride-erg',
+    'Free Ride (Manual ERG)',
+    'Endurance',
+    'Open 60-minute ERG ride. Use the +/- 10W buttons to dial in any exact target wattage.',
+    [
+      { name: 'Free Ride ERG', type: 'steady', durationSec: 3600, startPowerPct: 0.65, endPowerPct: 0.65, cadenceTarget: 90 },
+    ]
+  ),
 ];

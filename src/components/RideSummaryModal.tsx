@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Download, X } from 'lucide-react';
-import { computeRideStats } from '../workouts/engine';
+import { Download, X, Zap } from 'lucide-react';
+import { computeRideStats, estimateRampTestFtp } from '../workouts/engine';
 import type { TelemetrySample } from '../workouts/types';
 import { generateTcx } from '../export/tcx';
 
 interface RideSummaryModalProps {
+  workoutId: string;
   workoutName: string;
   samples: TelemetrySample[];
   startTimeIso: string;
   ftp: number;
+  onApplyFtp?: (newFtp: number) => void;
   onClose: () => void;
 }
 
@@ -23,15 +25,19 @@ function formatTime(sec: number): string {
 }
 
 export const RideSummaryModal: React.FC<RideSummaryModalProps> = ({
+  workoutId,
   workoutName,
   samples,
   startTimeIso,
   ftp,
+  onApplyFtp,
   onClose,
 }) => {
   const [title, setTitle] = useState(`Pixel Peloton — ${workoutName}`);
+  const [ftpApplied, setFtpApplied] = useState(false);
 
   const stats = computeRideStats(samples, ftp);
+  const estimatedFtp = workoutId === 'ftp-ramp-test' ? estimateRampTestFtp(samples) : null;
 
   const handleDownloadTcx = () => {
     const tcx = generateTcx(samples, title, startTimeIso);
@@ -117,6 +123,40 @@ export const RideSummaryModal: React.FC<RideSummaryModalProps> = ({
             </div>
           ))}
         </div>
+
+        {estimatedFtp !== null && (
+          <div
+            style={{
+              background: '#fef9c3',
+              border: '2px solid #ca8a04',
+              padding: '8px 10px',
+              marginBottom: 12,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 10,
+              fontSize: 12,
+            }}
+          >
+            <span>
+              <strong>Ramp Test Result:</strong> Estimated FTP is{' '}
+              <strong>{estimatedFtp} W</strong> (75% of best 1m power)
+            </span>
+            {onApplyFtp && (
+              <button
+                className="pixel-btn pixel-btn-success"
+                style={{ padding: '4px 8px' }}
+                disabled={ftpApplied}
+                onClick={() => {
+                  onApplyFtp(estimatedFtp);
+                  setFtpApplied(true);
+                }}
+              >
+                <Zap size={12} /> {ftpApplied ? 'FTP Updated' : `Set FTP ${estimatedFtp}W`}
+              </button>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <button className="pixel-btn pixel-btn-primary" onClick={handleDownloadTcx}>

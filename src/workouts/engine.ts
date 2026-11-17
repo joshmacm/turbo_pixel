@@ -154,3 +154,20 @@ export function computeRideStats(samples: TelemetrySample[], ftp: number): RideS
     tss,
   };
 }
+
+/**
+ * Estimates FTP as 75% of the highest 60-second rolling average power.
+ */
+export function estimateRampTestFtp(samples: TelemetrySample[]): number | null {
+  if (samples.length < 60) return null;
+  let winSum = 0;
+  for (let i = 0; i < 60; i++) {
+    winSum += samples[i].powerWatts;
+  }
+  let bestSum = winSum;
+  for (let i = 60; i < samples.length; i++) {
+    winSum += samples[i].powerWatts - samples[i - 60].powerWatts;
+    if (winSum > bestSum) bestSum = winSum;
+  }
+  return Math.round((bestSum / 60) * 0.75);
+}

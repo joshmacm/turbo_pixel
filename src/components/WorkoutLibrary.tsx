@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, Clock, Zap, Play } from 'lucide-react';
+import { Upload, Clock, Zap, Play, Plus, Trash2 } from 'lucide-react';
 import type { Workout, WorkoutCategory } from '../workouts/types';
 import { getZoneForPct } from '../workouts/zones';
 import { parseZwoXml } from '../workouts/zwoParser';
@@ -10,6 +10,8 @@ interface WorkoutLibraryProps {
   ftp: number;
   onSelect: (workout: Workout) => void;
   onImport: (workout: Workout) => void;
+  onOpenBuilder: () => void;
+  onDeleteCustom?: (id: string) => void;
 }
 
 const CATEGORIES: ('All' | WorkoutCategory)[] = [
@@ -33,6 +35,8 @@ export const WorkoutLibrary: React.FC<WorkoutLibraryProps> = ({
   ftp,
   onSelect,
   onImport,
+  onOpenBuilder,
+  onDeleteCustom,
 }) => {
   const [filter, setFilter] = useState<'All' | WorkoutCategory>('All');
   const [importError, setImportError] = useState<string | null>(null);
@@ -82,6 +86,14 @@ export const WorkoutLibrary: React.FC<WorkoutLibraryProps> = ({
               {cat}
             </button>
           ))}
+          <button
+            className="pixel-btn pixel-btn-primary"
+            style={{ padding: '4px 10px', fontSize: 11 }}
+            onClick={onOpenBuilder}
+            title="Create a custom interval workout"
+          >
+            <Plus size={13} /> New Workout
+          </button>
           <button
             className="pixel-btn"
             style={{ padding: '4px 10px', fontSize: 11 }}
@@ -148,16 +160,31 @@ export const WorkoutLibrary: React.FC<WorkoutLibraryProps> = ({
                   }}
                 >
                   <span style={{ fontWeight: 700, fontSize: 13 }}>{w.name}</span>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: 'var(--muted)',
-                      border: '1px solid var(--border)',
-                      padding: '1px 5px',
-                    }}
-                  >
-                    {w.category}
-                  </span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: 'var(--muted)',
+                        border: '1px solid var(--border)',
+                        padding: '1px 5px',
+                      }}
+                    >
+                      {w.category}
+                    </span>
+                    {w.category === 'Custom' && onDeleteCustom && (
+                      <button
+                        className="pixel-btn"
+                        style={{ padding: '2px 4px', boxShadow: 'none' }}
+                        title="Delete custom workout"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteCustom(w.id);
+                        }}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>
                   {w.description}

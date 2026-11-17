@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Bluetooth,
   Heart,
@@ -9,6 +9,9 @@ import {
   SkipBack,
   Minus,
   Plus,
+  Volume2,
+  VolumeX,
+  History,
 } from 'lucide-react';
 import { FtmsTrainer } from './ble/ftms';
 import { HeartRateMonitor } from './ble/heartRate';
@@ -16,9 +19,19 @@ import { PixelCanvas, SCENES, type SceneId } from './components/PixelCanvas';
 import { WorkoutProfile } from './components/WorkoutProfile';
 import { WorkoutLibrary } from './components/WorkoutLibrary';
 import { RideSummaryModal } from './components/RideSummaryModal';
+import { WorkoutBuilderModal } from './components/WorkoutBuilderModal';
+import { RideHistoryModal } from './components/RideHistoryModal';
 import { WORKOUT_LIBRARY } from './workouts/library';
-import { getActiveBlockAtTime, getBlockStartTime } from './workouts/engine';
+import { computeRideStats, getActiveBlockAtTime, getBlockStartTime } from './workouts/engine';
 import { getZoneForPct } from './workouts/zones';
+import { playCountdownBeep } from './utils/audio';
+import {
+  deleteRideFromHistory,
+  loadRideHistory,
+  saveRideToHistory,
+  type SavedRide,
+} from './utils/history';
+import { generateTcx } from './export/tcx';
 import type { TelemetrySample, Workout } from './workouts/types';
 
 function formatClock(sec: number): string {
@@ -40,12 +53,32 @@ export function App() {
   });
   const [ftpInput, setFtpInput] = useState<string>(() => String(ftp));
 
-  const [workouts, setWorkouts] = useState<Workout[]>(WORKOUT_LIBRARY);
+  const [customWorkouts, setCustomWorkouts] = useState<Workout[]>(() => {
+    try {
+      const raw = localStorage.getItem('pp_custom_workouts');
+      return raw ? (JSON.parse(raw) as Workout[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  const workouts = [...customWorkouts, ...WORKOUT_LIBRARY];
   const [selectedWorkout, setSelectedWorkout] = useState<Workout>(WORKOUT_LIBRARY[0]);
   const [scene, setScene] = useState<SceneId>(() => {
     const saved = localStorage.getItem('pp_scene') as SceneId | null;
     return saved && SCENES.some((s) => s.id === saved) ? saved : 'bristol';
   });
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(
+    () => localStorage.getItem('pp_sound') !== 'off'
+  );
+  const [smooth3s, setSmooth3s] = useState<boolean>(
+    () => localStorage.getItem('pp_smooth') !== 'off'
+  );
+  const [autoPauseEnabled, setAutoPauseEnabled] = useState<boolean>(
+    () => localStorage.getItem('pp_autopause') === 'on'
+  );
+  const [rideHistory, setRideHistory] = useState<SavedRide[]>(() => loadRideHistory());
+  const [showBuilder, setShowBuilder] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Device state
   const [trainerConnected, setTrainerConnected] = useState(false);
@@ -64,6 +97,7 @@ export function App() {
   const [rideState, setRideState] = useState<'idle' | 'running' | 'paused'>('idle');
   const [elapsedSec, setElapsedSec] = useState(0);
   const [biasPct, setBiasPct] = useState(100);
+  const [manualWatts, setManualWatts] = useState<number>(() => Math.round(ftp * 0.65));
   const [samples, setSamples] = useState<TelemetrySample[]>([]);
   const [startTimeIso, setStartTimeIso] = useState<string>(() => new Date().toISOString());
   const [showSummary, setShowSummary] = useState(false);
@@ -73,6 +107,9 @@ export function App() {
   const hrmRef = useRef<HeartRateMonitor | null>(null);
   const lastSentTargetRef = useRef<number>(-1);
   const distanceMetersRef = useRef<number>(0);
+  const recentPowersRef = useRef<number[]>([]);
+  const coastSecRef = useRef<number>(0);
+  const autoPausedRef = useRef<boolean>(false);
 
   const liveRef = useRef({
     powerWatts: 0,
@@ -89,6 +126,43 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('pp_scene', scene);
   }, [scene]);
+
+  useEffect(() => {
+    localStorage.setItem('pp_custom_workouts', JSON.stringify(customWorkouts));
+  }, [customWorkouts]);
+
+  useEffect(() => {
+    localStorage.setItem('pp_sound', soundEnabled ? 'on' : 'off');
+  }, [soundEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('pp_smooth', smooth3s ? 'on' : 'off');
+  }, [smooth3s]);
+
+  useEffect(() => {
+    localStorage.setItem('pp_autopause', autoPauseEnabled ? 'on' : 'off');
+  }, [autoPauseEnabled]);
+
+  // Screen Wake Lock while riding
+  useEffect(() => {
+    let sentinel: { release: () => Promise<void> } | null = null;
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> };
+    };
+    if (rideState === 'running' && nav.wakeLock) {
+      nav.wakeLock
+        .request('screen')
+        .then((s) => {
+          sentinel = s;
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      if (sentinel) {
+        sentinel.release().catch(() => undefined);
+      }
+    };
+  }, [rideState]);
 
   // Connect / Disconnect Saris H3 (FTMS)
   const toggleTrainer = async () => {
@@ -143,19 +217,84 @@ export function App() {
     }
   };
 
+  const isFreeRide = selectedWorkout.id === 'free-ride-erg';
   const activeBlock = getActiveBlockAtTime(selectedWorkout, elapsedSec, ftp, biasPct);
-  const targetWatts = activeBlock ? activeBlock.targetWatts : Math.round(ftp * 0.5);
+  const targetWatts = isFreeRide
+    ? manualWatts
+    : activeBlock
+    ? activeBlock.targetWatts
+    : Math.round(ftp * 0.5);
   const nextBlock =
     activeBlock && activeBlock.blockIndex + 1 < selectedWorkout.blocks.length
       ? selectedWorkout.blocks[activeBlock.blockIndex + 1]
       : null;
 
+  const finalizeRide = useCallback(
+    (recordedSamples: TelemetrySample[]) => {
+      if (recordedSamples.length === 0) return;
+      const stats = computeRideStats(recordedSamples, ftp);
+      const title = `Pixel Peloton — ${selectedWorkout.name}`;
+      const tcx = generateTcx(recordedSamples, title, startTimeIso);
+      const saved: SavedRide = {
+        id: `ride-${Date.now()}`,
+        title,
+        dateIso: startTimeIso,
+        durationSec: stats.durationSec,
+        distanceKm: stats.distanceKm,
+        avgPower: stats.avgPower,
+        normalizedPower: stats.normalizedPower,
+        avgHr: stats.avgHr,
+        tss: stats.tss,
+        tcx,
+      };
+      setRideHistory(saveRideToHistory(saved));
+      setShowSummary(true);
+    },
+    [ftp, selectedWorkout.name, startTimeIso]
+  );
+
   // 1Hz workout loop
   useEffect(() => {
     const timer = window.setInterval(() => {
+      // Track 3s rolling power average
+      recentPowersRef.current = [...recentPowersRef.current.slice(-2), liveRef.current.powerWatts];
+
+      // Auto-pause / auto-resume on coasting when trainer is connected
+      if (autoPauseEnabled && trainerConnected) {
+        const isCoasting = liveRef.current.cadenceRpm === 0 && liveRef.current.powerWatts < 10;
+        if (rideState === 'running') {
+          if (isCoasting) {
+            coastSecRef.current += 1;
+            if (coastSecRef.current >= 3) {
+              autoPausedRef.current = true;
+              trainerRef.current?.pause();
+              setRideState('paused');
+              return;
+            }
+          } else {
+            coastSecRef.current = 0;
+          }
+        } else if (rideState === 'paused' && autoPausedRef.current && !isCoasting) {
+          autoPausedRef.current = false;
+          coastSecRef.current = 0;
+          trainerRef.current?.resume();
+          setRideState('running');
+        }
+      }
+
       if (rideState !== 'running') return;
 
-      // Send ERG target power to physical trainer when it changes (or every 5s keepalive)
+      // 3-2-1 interval countdown beeps
+      if (soundEnabled && activeBlock && !isFreeRide) {
+        const rem = Math.round(activeBlock.blockRemainingSec);
+        if (rem === 3 || rem === 2 || rem === 1) {
+          playCountdownBeep(false);
+        } else if (activeBlock.blockElapsedSec === 0 && elapsedSec > 0) {
+          playCountdownBeep(true);
+        }
+      }
+
+      // Send ERG target power to physical trainer when it changes
       if (trainerConnected && trainerRef.current) {
         if (lastSentTargetRef.current !== targetWatts) {
           lastSentTargetRef.current = targetWatts;
@@ -184,18 +323,31 @@ export function App() {
           speedKmh: Number(currentSpeed.toFixed(1)),
           distanceMeters: distanceMetersRef.current,
         };
-        setSamples((s) => [...s, sample]);
-
-        if (next >= selectedWorkout.totalDurationSec) {
-          setRideState('paused');
-          setShowSummary(true);
-        }
+        setSamples((s) => {
+          const updated = [...s, sample];
+          if (next >= selectedWorkout.totalDurationSec) {
+            setRideState('paused');
+            finalizeRide(updated);
+          }
+          return updated;
+        });
         return next;
       });
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [rideState, trainerConnected, targetWatts, selectedWorkout.totalDurationSec]);
+  }, [
+    rideState,
+    trainerConnected,
+    targetWatts,
+    selectedWorkout.totalDurationSec,
+    autoPauseEnabled,
+    soundEnabled,
+    activeBlock,
+    elapsedSec,
+    isFreeRide,
+    finalizeRide,
+  ]);
 
   const handleStart = () => {
     if (rideState === 'idle') {
@@ -203,22 +355,27 @@ export function App() {
       setSamples([]);
       distanceMetersRef.current = 0;
       lastSentTargetRef.current = -1;
+      coastSecRef.current = 0;
+      autoPausedRef.current = false;
       setStartTimeIso(new Date().toISOString());
     }
+    autoPausedRef.current = false;
     trainerRef.current?.resume();
     setRideState('running');
   };
 
   const handlePause = () => {
+    autoPausedRef.current = false;
     trainerRef.current?.pause();
     setRideState('paused');
   };
 
   const handleEndRide = () => {
+    autoPausedRef.current = false;
     trainerRef.current?.pause();
     setRideState('idle');
     if (samples.length > 0) {
-      setShowSummary(true);
+      finalizeRide(samples);
     }
   };
 
@@ -243,7 +400,18 @@ export function App() {
     lastSentTargetRef.current = -1;
   };
 
-  const zone = getZoneForPct(ftp > 0 ? powerWatts / ftp : 0);
+  const displayPowerWatts =
+    smooth3s && recentPowersRef.current.length > 0
+      ? Math.round(
+          recentPowersRef.current.reduce((a, b) => a + b, 0) / recentPowersRef.current.length
+        )
+      : powerWatts;
+
+  const zone = getZoneForPct(ftp > 0 ? displayPowerWatts / ftp : 0);
+  const rideProgress =
+    selectedWorkout.totalDurationSec > 0
+      ? Math.min(1, elapsedSec / selectedWorkout.totalDurationSec)
+      : 0;
 
   return (
     <div style={{ maxWidth: 1120, margin: '0 auto', padding: '14px 16px 32px' }}>
@@ -332,6 +500,22 @@ export function App() {
             <Heart size={14} />
             {hrConnected ? hrName || 'HRM OK' : 'Heart Rate'}
           </button>
+
+          <button
+            className="pixel-btn"
+            onClick={() => setSoundEnabled((s) => !s)}
+            title="Toggle 3-2-1 interval countdown beeps"
+          >
+            {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+          </button>
+
+          <button
+            className="pixel-btn"
+            onClick={() => setShowHistory(true)}
+            title="View saved ride history"
+          >
+            <History size={14} /> History ({rideHistory.length})
+          </button>
         </div>
       </header>
 
@@ -399,10 +583,11 @@ export function App() {
           scene={scene}
           speedKmh={speedKmh}
           cadenceRpm={cadenceRpm}
-          powerWatts={powerWatts}
+          powerWatts={displayPowerWatts}
           ftp={ftp}
           isPaused={rideState !== 'running'}
           distanceMeters={distanceMetersRef.current}
+          progress={rideProgress}
         />
       </div>
 
@@ -416,12 +601,36 @@ export function App() {
         }}
       >
         <div className="pixel-panel" style={{ padding: '10px 14px', borderColor: zone.color }}>
-          <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4 }}>
-            POWER / TARGET (ERG)
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: 10,
+              color: 'var(--muted)',
+              marginBottom: 4,
+            }}
+          >
+            <span>POWER / TARGET (ERG)</span>
+            <button
+              onClick={() => setSmooth3s((s) => !s)}
+              style={{
+                background: smooth3s ? 'var(--panel-alt)' : 'transparent',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
+                fontSize: 9,
+                fontFamily: 'var(--font-mono)',
+                padding: '1px 4px',
+                cursor: 'pointer',
+              }}
+              title="Toggle 3-second power smoothing"
+            >
+              {smooth3s ? '3s AVG' : '1s RAW'}
+            </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span style={{ fontSize: 28, fontWeight: 700, color: zone.color }}>
-              {powerWatts}
+              {displayPowerWatts}
             </span>
             <span style={{ fontSize: 14, color: 'var(--muted)' }}>/ {targetWatts} W</span>
           </div>
@@ -498,35 +707,77 @@ export function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          {/* Bias controls */}
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              background: 'var(--panel-alt)',
-              border: '2px solid var(--border-bright)',
-              padding: '3px 6px',
-              fontSize: 12,
-            }}
+          <button
+            className={`pixel-btn ${autoPauseEnabled ? 'pixel-btn-primary' : ''}`}
+            style={{ padding: '4px 8px', fontSize: 11 }}
+            onClick={() => setAutoPauseEnabled((a) => !a)}
+            title="Auto-pause when coasting (0 RPM)"
           >
-            <span style={{ color: 'var(--muted)', marginRight: 2 }}>ERG</span>
-            <button
-              className="pixel-btn"
-              style={{ padding: '2px 6px' }}
-              onClick={() => setBiasPct((b) => Math.max(70, b - 5))}
+            Auto-Pause: {autoPauseEnabled ? 'ON' : 'OFF'}
+          </button>
+
+          {/* Bias or Manual Free Ride Watts controls */}
+          {isFreeRide ? (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                background: 'var(--panel-alt)',
+                border: '2px solid var(--border-bright)',
+                padding: '3px 6px',
+                fontSize: 12,
+              }}
             >
-              <Minus size={12} />
-            </button>
-            <span style={{ minWidth: 40, textAlign: 'center', fontWeight: 700 }}>{biasPct}%</span>
-            <button
-              className="pixel-btn"
-              style={{ padding: '2px 6px' }}
-              onClick={() => setBiasPct((b) => Math.min(130, b + 5))}
+              <span style={{ color: 'var(--muted)', marginRight: 2 }}>ERG</span>
+              <button
+                className="pixel-btn"
+                style={{ padding: '2px 6px' }}
+                onClick={() => setManualWatts((w) => Math.max(50, w - 10))}
+              >
+                <Minus size={12} />
+              </button>
+              <span style={{ minWidth: 48, textAlign: 'center', fontWeight: 700 }}>
+                {manualWatts}W
+              </span>
+              <button
+                className="pixel-btn"
+                style={{ padding: '2px 6px' }}
+                onClick={() => setManualWatts((w) => Math.min(800, w + 10))}
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                background: 'var(--panel-alt)',
+                border: '2px solid var(--border-bright)',
+                padding: '3px 6px',
+                fontSize: 12,
+              }}
             >
-              <Plus size={12} />
-            </button>
-          </div>
+              <span style={{ color: 'var(--muted)', marginRight: 2 }}>ERG</span>
+              <button
+                className="pixel-btn"
+                style={{ padding: '2px 6px' }}
+                onClick={() => setBiasPct((b) => Math.max(70, b - 5))}
+              >
+                <Minus size={12} />
+              </button>
+              <span style={{ minWidth: 40, textAlign: 'center', fontWeight: 700 }}>{biasPct}%</span>
+              <button
+                className="pixel-btn"
+                style={{ padding: '2px 6px' }}
+                onClick={() => setBiasPct((b) => Math.min(130, b + 5))}
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+          )}
 
           <button
             className="pixel-btn"
@@ -585,17 +836,48 @@ export function App() {
         ftp={ftp}
         onSelect={handleSelectWorkout}
         onImport={(w) => {
-          setWorkouts((prev) => [w, ...prev]);
+          setCustomWorkouts((prev) => [w, ...prev]);
           handleSelectWorkout(w);
+        }}
+        onOpenBuilder={() => setShowBuilder(true)}
+        onDeleteCustom={(id) => {
+          setCustomWorkouts((prev) => prev.filter((w) => w.id !== id));
+          if (selectedWorkout.id === id) {
+            handleSelectWorkout(WORKOUT_LIBRARY[0]);
+          }
         }}
       />
 
+      {showBuilder && (
+        <WorkoutBuilderModal
+          onSave={(w) => {
+            setCustomWorkouts((prev) => [w, ...prev]);
+            handleSelectWorkout(w);
+            setShowBuilder(false);
+          }}
+          onClose={() => setShowBuilder(false)}
+        />
+      )}
+
+      {showHistory && (
+        <RideHistoryModal
+          rides={rideHistory}
+          onDelete={(id) => setRideHistory(deleteRideFromHistory(id))}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
+
       {showSummary && (
         <RideSummaryModal
+          workoutId={selectedWorkout.id}
           workoutName={selectedWorkout.name}
           samples={samples}
           startTimeIso={startTimeIso}
           ftp={ftp}
+          onApplyFtp={(newFtp) => {
+            setFtp(newFtp);
+            setFtpInput(String(newFtp));
+          }}
           onClose={() => setShowSummary(false)}
         />
       )}

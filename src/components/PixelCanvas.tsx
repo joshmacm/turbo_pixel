@@ -20,6 +20,7 @@ interface PixelCanvasProps {
   ftp: number;
   isPaused: boolean;
   distanceMeters: number;
+  progress?: number;
 }
 
 const W = 320;
@@ -33,6 +34,7 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
   ftp,
   isPaused,
   distanceMeters,
+  progress = 0,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stateRef = useRef({
@@ -43,6 +45,7 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
     ftp,
     isPaused,
     distanceMeters,
+    progress,
   });
 
   stateRef.current = {
@@ -53,6 +56,7 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
     ftp,
     isPaused,
     distanceMeters,
+    progress,
   };
 
   useEffect(() => {
@@ -474,6 +478,13 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
       else if (s.scene === 'devon') drawDevon();
       else if (s.scene === 'belgium') drawBelgium();
       else drawGirona();
+
+      // Day-to-Dusk sky progression in final 35% of workout
+      if (s.progress > 0.65) {
+        const duskAlpha = Math.min(0.42, ((s.progress - 0.65) / 0.35) * 0.42);
+        ctx.fillStyle = `rgba(234, 88, 12, ${duskAlpha.toFixed(2)})`;
+        ctx.fillRect(0, 0, W, 98);
+      }
 
       // Road (cobbles in Belgium, asphalt elsewhere)
       rect(0, 106, W, 3, '#cbd5e1');

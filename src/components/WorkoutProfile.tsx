@@ -51,19 +51,28 @@ export const WorkoutProfile: React.FC<WorkoutProfileProps> = ({
   const ftpY = H - (1.0 / maxPct) * (H - 10);
   const playheadX = Math.min(W, Math.max(0, (elapsedSec / totalSec) * W));
 
-  // Build live actual-power polyline (downsampled for SVG speed)
+  // Build live actual-power & HR polylines (downsampled for SVG speed)
   let tracePoints = '';
+  let hrPoints = '';
   if (samples.length > 1 && ftp > 0) {
     const step = Math.max(1, Math.floor(samples.length / 250));
     const pts: string[] = [];
+    const hPts: string[] = [];
     for (let i = 0; i < samples.length; i += step) {
       const s = samples[i];
       const x = Math.min(W, (s.elapsedSec / totalSec) * W);
       const pct = s.powerWatts / ftp;
       const y = Math.max(2, H - (pct / maxPct) * (H - 10));
       pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+
+      if (s.heartRateBpm > 0) {
+        const hrNorm = Math.max(0, Math.min(1, (s.heartRateBpm - 55) / 145));
+        const hy = Math.max(2, H - hrNorm * (H - 10));
+        hPts.push(`${x.toFixed(1)},${hy.toFixed(1)}`);
+      }
     }
     tracePoints = pts.join(' ');
+    hrPoints = hPts.join(' ');
   }
 
   return (
@@ -115,6 +124,17 @@ export const WorkoutProfile: React.FC<WorkoutProfileProps> = ({
             strokeWidth={2}
             points={tracePoints}
             opacity={0.9}
+          />
+        )}
+
+        {/* Live HR trace */}
+        {hrPoints && (
+          <polyline
+            fill="none"
+            stroke="#dc2626"
+            strokeWidth={1.75}
+            points={hrPoints}
+            opacity={0.85}
           />
         )}
 
