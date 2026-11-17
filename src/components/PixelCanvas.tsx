@@ -255,6 +255,31 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
       // Sandy beach & Promenade wall
       rect(0, 99, W, 5, '#fde68a');
       rect(0, 102, W, 4, '#cbd5e1');
+
+      // Ripples Ice Cream Parlour along the Swansea Bay promenade (0.55x)
+      const rOff = (worldX * 0.55) % 280;
+      for (let i = -1; i < 3; i++) {
+        const rx = i * 280 - rOff + 110;
+        // Cream & pastel-blue seafront shopfront
+        rect(rx, 82, 42, 22, '#fffbeb');
+        rect(rx - 1, 79, 44, 4, '#0284c7'); // Blue roof trim
+        // Striped pink & white awning
+        for (let a = 0; a < 7; a++) {
+          rect(rx + 2 + a * 5, 89, 5, 3, a % 2 === 0 ? '#f472b6' : '#ffffff');
+        }
+        rect(rx + 6, 94, 12, 8, '#bae6fd'); // Serving window
+        rect(rx + 24, 93, 7, 11, '#0284c7'); // Door
+        // Giant pixel ice-cream cone sign
+        rect(rx + 35, 84, 5, 3, '#f472b6'); // Strawberry scoop
+        rect(rx + 36, 82, 3, 2, '#fef08a'); // Vanilla scoop
+        rect(rx + 36, 87, 3, 4, '#d97706'); // Waffle cone
+        // RIPPLES sign
+        rect(rx + 5, 82, 32, 6, '#ffffff');
+        ctx.fillStyle = '#0284c7';
+        ctx.font = 'bold 5px monospace';
+        ctx.fillText('RIPPLES', Math.round(rx + 8), 87);
+      }
+
       const postOff = (worldX * 0.7) % 48;
       for (let i = -1; i < 8; i++) {
         const px = i * 48 - postOff;
