@@ -350,19 +350,19 @@ export function App() {
           <button
             className={`pixel-btn ${trainerConnected ? 'pixel-btn-success' : ''}`}
             onClick={toggleTrainer}
-            title="Connect Saris H3 or any FTMS smart trainer"
+            title="Connect any FTMS smart trainer (Saris, Wahoo, Tacx, Elite, etc.)"
           >
             <Bluetooth size={14} />
-            {trainerConnected ? trainerName || 'Trainer OK' : 'Saris H3'}
+            {trainerConnected ? trainerName || 'Trainer OK' : 'Smart Trainer'}
           </button>
 
           <button
             className={`pixel-btn ${hrConnected ? 'pixel-btn-success' : ''}`}
             onClick={toggleHr}
-            title="Connect Coospo or any BLE Heart Rate Monitor"
+            title="Connect any BLE Heart Rate Monitor"
           >
             <Heart size={14} />
-            {hrConnected ? hrName || 'HRM OK' : 'Coospo HR'}
+            {hrConnected ? hrName || 'HRM OK' : 'Heart Rate'}
           </button>
 
           <button
