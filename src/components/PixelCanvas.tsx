@@ -281,24 +281,31 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
         ctx.font = 'bold 5px monospace';
         ctx.fillText('RIPPLES', Math.round(rx + 8), 87);
 
-        // Once every ~5 minutes, a man pops out of Ripples and waves!
+        // Once every ~5 minutes, a man walks out of Ripples, waves, and walks back in!
         const rWaveCycle = (now % 300000) / 300000;
-        if (rWaveCycle < 0.018) {
-          const mx = rx + 26;
-          const my = 96;
-          const waveUp = Math.floor(now / 180) % 2 === 0;
-          rect(mx, my + 3, 4, 5, '#0284c7'); // Blue shirt/apron
-          rect(mx + 1, my + 4, 2, 4, '#ffffff'); // White apron
+        if (rWaveCycle < 0.022) {
+          const wt = rWaveCycle / 0.022;
+          const walkProgress =
+            wt < 0.25 ? wt / 0.25 : wt > 0.75 ? (1 - wt) / 0.25 : 1;
+          const mx = rx + 25 + walkProgress * 12;
+          const my = 96 + walkProgress * 3;
+          const isWalking = wt < 0.25 || wt > 0.75;
+          const stride = isWalking ? Math.round(Math.sin(now * 0.03)) : 0;
+
+          rect(mx, my + 3, 4, 4, '#0284c7'); // Blue shirt
+          rect(mx + 1, my + 4, 2, 3, '#ffffff'); // White apron
           rect(mx + 1, my, 3, 3, '#f1c27d'); // Head
-          // Waving arm
-          if (waveUp) {
-            rect(mx + 4, my - 1, 2, 3, '#f1c27d');
-          } else {
-            rect(mx + 4, my + 2, 2, 2, '#f1c27d');
+          // Walking legs
+          rect(mx + stride, my + 7, 1, 2, '#1e293b');
+          rect(mx + 3 - stride, my + 7, 1, 2, '#1e293b');
+
+          if (!isWalking) {
+            const waveUp = Math.floor(now / 180) % 2 === 0;
+            rect(mx + 4, waveUp ? my - 1 : my + 2, 2, waveUp ? 3 : 2, '#f1c27d');
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 5px monospace';
+            ctx.fillText('HI!', Math.round(mx - 1), my - 3);
           }
-          ctx.fillStyle = '#0f172a';
-          ctx.font = 'bold 5px monospace';
-          ctx.fillText('HI!', Math.round(mx - 1), my - 3);
         }
       }
 
