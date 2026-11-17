@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, Clock, Zap, Play, Plus, Trash2 } from 'lucide-react';
+import { Upload, Clock, Zap, Play, Plus, Trash2, Sparkles } from 'lucide-react';
 import type { Workout, WorkoutCategory } from '../workouts/types';
 import { getZoneForPct } from '../workouts/zones';
 import { parseZwoXml } from '../workouts/zwoParser';
@@ -11,6 +11,7 @@ interface WorkoutLibraryProps {
   onSelect: (workout: Workout) => void;
   onImport: (workout: Workout) => void;
   onOpenBuilder: () => void;
+  onOpenAiGenerator: () => void;
   onDeleteCustom?: (id: string) => void;
 }
 
@@ -36,6 +37,7 @@ export const WorkoutLibrary: React.FC<WorkoutLibraryProps> = ({
   onSelect,
   onImport,
   onOpenBuilder,
+  onOpenAiGenerator,
   onDeleteCustom,
 }) => {
   const [filter, setFilter] = useState<'All' | WorkoutCategory>('All');
@@ -88,6 +90,14 @@ export const WorkoutLibrary: React.FC<WorkoutLibraryProps> = ({
           ))}
           <button
             className="pixel-btn pixel-btn-primary"
+            style={{ padding: '4px 10px', fontSize: 11 }}
+            onClick={onOpenAiGenerator}
+            title="Describe what you want and get 3 tailored workouts"
+          >
+            <Sparkles size={13} /> AI Generate
+          </button>
+          <button
+            className="pixel-btn"
             style={{ padding: '4px 10px', fontSize: 11 }}
             onClick={onOpenBuilder}
             title="Create a custom interval workout"

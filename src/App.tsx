@@ -21,6 +21,7 @@ import { WorkoutLibrary } from './components/WorkoutLibrary';
 import { RideSummaryModal } from './components/RideSummaryModal';
 import { WorkoutBuilderModal } from './components/WorkoutBuilderModal';
 import { RideHistoryModal } from './components/RideHistoryModal';
+import { AiWorkoutModal } from './components/AiWorkoutModal';
 import { WORKOUT_LIBRARY } from './workouts/library';
 import { computeRideStats, getActiveBlockAtTime, getBlockStartTime } from './workouts/engine';
 import { getZoneForPct } from './workouts/zones';
@@ -79,6 +80,7 @@ export function App() {
   );
   const [rideHistory, setRideHistory] = useState<SavedRide[]>(() => loadRideHistory());
   const [showBuilder, setShowBuilder] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [coachMessage, setCoachMessage] = useState<string>('');
   const lastMsgBlockRef = useRef<number>(-1);
@@ -865,6 +867,7 @@ export function App() {
           handleSelectWorkout(w);
         }}
         onOpenBuilder={() => setShowBuilder(true)}
+        onOpenAiGenerator={() => setShowAiModal(true)}
         onDeleteCustom={(id) => {
           setCustomWorkouts((prev) => prev.filter((w) => w.id !== id));
           if (selectedWorkout.id === id) {
@@ -872,6 +875,18 @@ export function App() {
           }
         }}
       />
+
+      {showAiModal && (
+        <AiWorkoutModal
+          ftp={ftp}
+          onSelectAndSave={(w) => {
+            setCustomWorkouts((prev) => [w, ...prev]);
+            handleSelectWorkout(w);
+            setShowAiModal(false);
+          }}
+          onClose={() => setShowAiModal(false)}
+        />
+      )}
 
       {showBuilder && (
         <WorkoutBuilderModal
