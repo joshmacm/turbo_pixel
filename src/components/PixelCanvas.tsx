@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { getZoneForPct } from '../workouts/zones';
 
-export type SceneId = 'bristol' | 'swansea' | 'brecon' | 'devon' | 'girona' | 'belgium';
+export type SceneId = 'bristol' | 'swansea' | 'brecon' | 'devon' | 'girona' | 'belgium' | 'neath';
 
 export const SCENES: { id: SceneId; label: string }[] = [
   { id: 'bristol', label: 'Bristol' },
@@ -10,6 +10,7 @@ export const SCENES: { id: SceneId; label: string }[] = [
   { id: 'devon', label: 'Devon' },
   { id: 'girona', label: 'Girona' },
   { id: 'belgium', label: 'Belgium' },
+  { id: 'neath', label: 'Neath' },
 ];
 
 interface PixelCanvasProps {
@@ -456,6 +457,62 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
       }
     };
 
+    const drawNeath = (now: number) => {
+      // Crisp Welsh valley sky
+      rect(0, 0, W, 32, '#38bdf8');
+      rect(0, 32, W, 34, '#7dd3fc');
+      rect(0, 66, W, 32, '#e0f2fe');
+      rect(266, 12, 14, 14, '#fde047');
+      for (let i = 0; i < 4; i++) {
+        const cx = ((i * 95 - cloudX) % (W + 40) + (W + 40)) % (W + 40) - 30;
+        drawCloud(cx, 12 + (i % 2) * 14);
+      }
+
+      // Neath Valley hills (0.2x)
+      const hOff = (worldX * 0.2) % 140;
+      for (let i = -1; i < 4; i++) {
+        const hx = i * 140 - hOff;
+        rect(hx, 78, 140, 22, i % 2 === 0 ? '#15803d' : '#166534');
+        rect(hx + 24, 71, 92, 9, '#22c55e');
+      }
+
+      // Neath Abbey ruins, The Gnoll stand & Rugby Pitch with H-posts (0.55x)
+      const nOff = (worldX * 0.55) % 240;
+      for (let i = -1; i < 3; i++) {
+        const nx = i * 240 - nOff;
+
+        // Neath Abbey stone arches
+        rect(nx + 14, 76, 36, 26, '#a8a29e');
+        rect(nx + 19, 82, 7, 16, '#7dd3fc'); // Gothic arch window 1
+        rect(nx + 31, 82, 7, 16, '#7dd3fc'); // Gothic arch window 2
+        rect(nx + 12, 73, 10, 5, '#78716c');
+
+        // The Gnoll Rugby Stand (black & white Welsh All Blacks!)
+        rect(nx + 76, 80, 54, 22, '#0f172a');
+        rect(nx + 74, 76, 58, 4, '#f8fafc');
+        rect(nx + 82, 86, 42, 6, '#334155');
+        rect(nx + 78, 94, 50, 2, '#f8fafc');
+
+        // Lush rugby pitch & white H-shaped goalposts
+        rect(nx + 140, 96, 86, 10, '#16a34a');
+        rect(nx + 154, 68, 2, 30, '#ffffff'); // Left post
+        rect(nx + 170, 68, 2, 30, '#ffffff'); // Right post
+        rect(nx + 154, 83, 18, 2, '#ffffff'); // Crossbar
+      }
+
+      // Occasional flying rugby ball arcing across the sky every ~5.5s
+      const cycle = (now % 5500) / 5500;
+      if (cycle < 0.45) {
+        const t = cycle / 0.45; // 0 -> 1 across the frame
+        const bx = -12 + t * (W + 24);
+        const by = 68 - Math.sin(t * Math.PI) * 52;
+        // Pixel rugby ball (brown leather + white laces)
+        rect(bx + 1, by, 6, 4, '#92400e');
+        rect(bx, by + 1, 8, 2, '#b45309');
+        rect(bx + 3, by + 1, 2, 1, '#ffffff');
+      }
+    };
+
     const frame = (now: number) => {
       const dt = Math.min(0.1, (now - lastTime) / 1000);
       lastTime = now;
@@ -477,6 +534,7 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
       else if (s.scene === 'brecon') drawBrecon();
       else if (s.scene === 'devon') drawDevon();
       else if (s.scene === 'belgium') drawBelgium();
+      else if (s.scene === 'neath') drawNeath(now);
       else drawGirona();
 
       // Day-to-Dusk sky progression in final 35% of workout
