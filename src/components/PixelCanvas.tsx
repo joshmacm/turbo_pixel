@@ -689,6 +689,40 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
         }
       }
 
+      // Brecon Beacons: stuck behind a herd of sheep every ~10 minutes
+      if (s.scene === 'brecon') {
+        const sCycle = (now % 600000) / 600000;
+        if (sCycle < 0.01) {
+          const st = sCycle / 0.01; // ~6 seconds
+          // Sheep herd wanders in from right, blocks road ahead of rider, then clears
+          const herdX = st < 0.2 ? 320 - (st / 0.2) * 175 : st > 0.8 ? 145 + ((st - 0.8) / 0.2) * 195 : 145;
+          const sheepOffsets = [
+            { dx: 0, dy: 2 },
+            { dx: 14, dy: -2 },
+            { dx: 24, dy: 4 },
+            { dx: 36, dy: 0 },
+            { dx: 48, dy: 3 },
+            { dx: 58, dy: -1 },
+          ];
+          sheepOffsets.forEach((off, idx) => {
+            const hop = Math.round(Math.sin(now * 0.015 + idx) * 1);
+            const sx = herdX + off.dx;
+            const sy = 113 + off.dy + hop;
+            // Woolly body, legs, black head & ears
+            rect(sx, sy, 9, 5, '#f8fafc');
+            rect(sx + 1, sy - 1, 7, 1, '#e2e8f0');
+            rect(sx + 1, sy + 5, 1, 2, '#0f172a');
+            rect(sx + 7, sy + 5, 1, 2, '#0f172a');
+            rect(sx + 8, sy + 1, 3, 3, '#0f172a');
+          });
+          if (st >= 0.2 && st <= 0.8) {
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 6px monospace';
+            ctx.fillText('BAA!', Math.round(herdX + 12), 106);
+          }
+        }
+      }
+
       // Zone badge top-left (now rendered as crisp HTML overlay below)
       rafId = requestAnimationFrame(frame);
     };
