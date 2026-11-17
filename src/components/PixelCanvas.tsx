@@ -500,10 +500,10 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
         rect(nx + 154, 83, 18, 2, '#ffffff'); // Crossbar
       }
 
-      // Occasional flying rugby ball arcing across the sky every ~5.5s
-      const cycle = (now % 5500) / 5500;
-      if (cycle < 0.45) {
-        const t = cycle / 0.45; // 0 -> 1 across the frame
+      // Occasional flying rugby ball arcing across the sky roughly once per minute
+      const cycle = (now % 60000) / 60000;
+      if (cycle < 0.04) {
+        const t = cycle / 0.04; // ~2.4s flight across the frame
         const bx = -12 + t * (W + 24);
         const by = 68 - Math.sin(t * Math.PI) * 52;
         // Pixel rugby ball (brown leather + white laces)
