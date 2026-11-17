@@ -74,7 +74,7 @@ export function App() {
     () => localStorage.getItem('pp_smooth') !== 'off'
   );
   const [autoPauseEnabled, setAutoPauseEnabled] = useState<boolean>(
-    () => localStorage.getItem('pp_autopause') === 'on'
+    () => localStorage.getItem('pp_autopause') !== 'off'
   );
   const [rideHistory, setRideHistory] = useState<SavedRide[]>(() => loadRideHistory());
   const [showBuilder, setShowBuilder] = useState(false);
