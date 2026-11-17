@@ -7,13 +7,11 @@ import {
   Square,
   SkipForward,
   SkipBack,
-  Cpu,
   Minus,
   Plus,
 } from 'lucide-react';
 import { FtmsTrainer } from './ble/ftms';
 import { HeartRateMonitor } from './ble/heartRate';
-import { RideSimulator } from './ble/simulator';
 import { PixelCanvas, SCENES, type SceneId } from './components/PixelCanvas';
 import { WorkoutProfile } from './components/WorkoutProfile';
 import { WorkoutLibrary } from './components/WorkoutLibrary';
@@ -54,7 +52,6 @@ export function App() {
   const [trainerName, setTrainerName] = useState('');
   const [hrConnected, setHrConnected] = useState(false);
   const [hrName, setHrName] = useState('');
-  const [simEnabled, setSimEnabled] = useState(false);
   const [bleError, setBleError] = useState<string | null>(null);
 
   // Live telemetry
@@ -74,7 +71,6 @@ export function App() {
   // Refs for 1Hz loop & BLE instances
   const trainerRef = useRef<FtmsTrainer | null>(null);
   const hrmRef = useRef<HeartRateMonitor | null>(null);
-  const simRef = useRef<RideSimulator>(new RideSimulator());
   const lastSentTargetRef = useRef<number>(-1);
   const distanceMetersRef = useRef<number>(0);
 
@@ -88,7 +84,6 @@ export function App() {
 
   useEffect(() => {
     localStorage.setItem('pp_ftp', String(ftp));
-    simRef.current.setFtp(ftp);
   }, [ftp]);
 
   useEffect(() => {
@@ -103,7 +98,6 @@ export function App() {
       return;
     }
     try {
-      if (simEnabled) setSimEnabled(false);
       const trainer = new FtmsTrainer(
         (data) => {
           if (data.powerWatts !== undefined) setPowerWatts(data.powerWatts);
@@ -134,7 +128,6 @@ export function App() {
       return;
     }
     try {
-      if (simEnabled) setSimEnabled(false);
       const hrm = new HeartRateMonitor(
         (bpm) => setHeartRateBpm(bpm),
         (connected, name, err) => {
@@ -150,21 +143,6 @@ export function App() {
     }
   };
 
-  const toggleSimulator = () => {
-    setBleError(null);
-    if (!simEnabled) {
-      if (trainerConnected) trainerRef.current?.disconnect();
-      if (hrConnected) hrmRef.current?.disconnect();
-      setSimEnabled(true);
-    } else {
-      setSimEnabled(false);
-      setPowerWatts(0);
-      setCadenceRpm(0);
-      setSpeedKmh(0);
-      setHeartRateBpm(0);
-    }
-  };
-
   const activeBlock = getActiveBlockAtTime(selectedWorkout, elapsedSec, ftp, biasPct);
   const targetWatts = activeBlock ? activeBlock.targetWatts : Math.round(ftp * 0.5);
   const nextBlock =
@@ -172,19 +150,9 @@ export function App() {
       ? selectedWorkout.blocks[activeBlock.blockIndex + 1]
       : null;
 
-  // 1Hz workout & simulator loop
+  // 1Hz workout loop
   useEffect(() => {
     const timer = window.setInterval(() => {
-      if (simEnabled) {
-        simRef.current.setTargetPower(targetWatts);
-        const sim = simRef.current.tick(rideState !== 'running');
-        setPowerWatts(sim.powerWatts);
-        setCadenceRpm(sim.cadenceRpm);
-        setSpeedKmh(sim.speedKmh);
-        setHeartRateBpm(sim.heartRateBpm);
-        liveRef.current = sim;
-      }
-
       if (rideState !== 'running') return;
 
       // Send ERG target power to physical trainer when it changes (or every 5s keepalive)
@@ -227,7 +195,7 @@ export function App() {
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [rideState, simEnabled, trainerConnected, targetWatts, selectedWorkout.totalDurationSec]);
+  }, [rideState, trainerConnected, targetWatts, selectedWorkout.totalDurationSec]);
 
   const handleStart = () => {
     if (rideState === 'idle') {
@@ -364,15 +332,6 @@ export function App() {
             <Heart size={14} />
             {hrConnected ? hrName || 'HRM OK' : 'Heart Rate'}
           </button>
-
-          <button
-            className={`pixel-btn ${simEnabled ? 'pixel-btn-primary' : ''}`}
-            onClick={toggleSimulator}
-            title="Simulate trainer & HRM data for testing"
-          >
-            <Cpu size={14} />
-            {simEnabled ? 'Sim: ON' : 'Sim'}
-          </button>
         </div>
       </header>
 
@@ -390,7 +349,7 @@ export function App() {
         >
           Web Bluetooth is not supported in this browser (e.g. Safari). Use{' '}
           <strong>Chrome, Edge, or Brave</strong> on macOS/Windows (or <strong>Bluefy</strong> on
-          iOS) to pair your Saris H3 &amp; Coospo HRM. Simulator mode &amp; .TCX export work here.
+          iOS) to pair your Smart Trainer &amp; Heart Rate Monitor.
         </div>
       )}
 
