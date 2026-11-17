@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { getZoneForPct } from '../workouts/zones';
 
-export type SceneId = 'bristol' | 'swansea' | 'brecon' | 'devon' | 'girona';
+export type SceneId = 'bristol' | 'swansea' | 'brecon' | 'devon' | 'girona' | 'belgium';
 
 export const SCENES: { id: SceneId; label: string }[] = [
   { id: 'bristol', label: 'Bristol' },
@@ -9,6 +9,7 @@ export const SCENES: { id: SceneId; label: string }[] = [
   { id: 'brecon', label: 'Brecon Beacons' },
   { id: 'devon', label: 'Devon' },
   { id: 'girona', label: 'Girona' },
+  { id: 'belgium', label: 'Belgium' },
 ];
 
 interface PixelCanvasProps {
@@ -393,6 +394,64 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
       rect(0, 102, W, 4, '#d6d3d1');
     };
 
+    const drawBelgium = () => {
+      // Crisp Flemish spring sky
+      rect(0, 0, W, 32, '#38bdf8');
+      rect(0, 32, W, 34, '#7dd3fc');
+      rect(0, 66, W, 32, '#e0f2fe');
+      rect(268, 12, 14, 14, '#fde047');
+      for (let i = 0; i < 4; i++) {
+        const cx = ((i * 95 - cloudX) % (W + 40) + (W + 40)) % (W + 40) - 30;
+        drawCloud(cx, 12 + (i % 2) * 14);
+      }
+
+      // Far Flemish fields & windmill (0.2x)
+      rect(0, 88, W, 12, '#65a30d');
+      const mOff = (worldX * 0.2) % 220;
+      for (let i = -1; i < 3; i++) {
+        const mx = i * 220 - mOff;
+        // Windmill tower & sails
+        rect(mx + 60, 72, 10, 20, '#d6d3d1');
+        rect(mx + 62, 68, 6, 4, '#9a3412');
+        drawLinePixels(mx + 56, 63, mx + 74, 81, '#78350f', 1);
+        drawLinePixels(mx + 74, 63, mx + 56, 81, '#78350f', 1);
+      }
+
+      // Roadside cafés, stepped-gable brick houses, Belgian flags & beer! (0.6x)
+      const bOff = (worldX * 0.6) % 190;
+      for (let i = -1; i < 3; i++) {
+        const bx = i * 190 - bOff;
+
+        // Stepped-gable Flemish brick house
+        rect(bx + 14, 78, 28, 28, '#b45309');
+        rect(bx + 18, 72, 20, 6, '#92400e');
+        rect(bx + 23, 67, 10, 5, '#78350f');
+        rect(bx + 19, 84, 5, 6, '#fef3c7');
+        rect(bx + 31, 84, 5, 6, '#fef3c7');
+        rect(bx + 25, 96, 6, 10, '#451a03');
+
+        // Café with awning & giant pixel beer sign
+        rect(bx + 62, 82, 34, 24, '#fef3c7');
+        rect(bx + 60, 78, 38, 4, '#991b1b');
+        rect(bx + 62, 91, 34, 3, '#dc2626'); // Café awning
+        // Frothy beer goblet sign on roof/wall
+        rect(bx + 104, 85, 7, 10, '#f59e0b'); // Amber beer
+        rect(bx + 103, 82, 9, 3, '#ffffff');  // Frothy head
+        rect(bx + 111, 87, 2, 5, '#cbd5e1');  // Handle
+
+        // Belgian tricolour flag (Black | Yellow | Red) on flagpole
+        rect(bx + 132, 68, 2, 38, '#475569');
+        rect(bx + 134, 68, 4, 10, '#0f172a');
+        rect(bx + 138, 68, 4, 10, '#facc15');
+        rect(bx + 142, 68, 4, 10, '#dc2626');
+
+        // Lion of Flanders yellow flag further along
+        rect(bx + 162, 74, 2, 32, '#475569');
+        rect(bx + 164, 74, 10, 8, '#facc15');
+        rect(bx + 167, 76, 4, 4, '#0f172a');
+      }
+    };
+
     const frame = (now: number) => {
       const dt = Math.min(0.1, (now - lastTime) / 1000);
       lastTime = now;
@@ -413,21 +472,40 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
       else if (s.scene === 'swansea') drawSwansea();
       else if (s.scene === 'brecon') drawBrecon();
       else if (s.scene === 'devon') drawDevon();
+      else if (s.scene === 'belgium') drawBelgium();
       else drawGirona();
 
-      // Road
+      // Road (cobbles in Belgium, asphalt elsewhere)
       rect(0, 106, W, 3, '#cbd5e1');
-      rect(0, 109, W, 27, '#475569');
-      const dashOffset = worldX % 28;
-      for (let i = -1; i < 14; i++) {
-        rect(i * 28 - dashOffset, 121, 14, 2, '#fde047');
+      if (s.scene === 'belgium') {
+        rect(0, 109, W, 27, '#57534e');
+        const cobOff = worldX % 12;
+        const cobColors = ['#78716c', '#a8a29e', '#64748b'];
+        for (let row = 0; row < 4; row++) {
+          const rowShift = (row % 2) * 6;
+          for (let col = -1; col < 29; col++) {
+            const cx = col * 12 + rowShift - cobOff;
+            const cy = 110 + row * 6;
+            rect(cx, cy, 9, 4, cobColors[(col + row + 30) % cobColors.length]);
+          }
+        }
+      } else {
+        rect(0, 109, W, 27, '#475569');
+        const dashOffset = worldX % 28;
+        for (let i = -1; i < 14; i++) {
+          rect(i * 28 - dashOffset, 121, 14, 2, '#fde047');
+        }
       }
 
-      // Pixel Cyclist
+      // Pixel Cyclist (subtle cobble bounce in Belgium when moving)
+      const cobbleBounce =
+        s.scene === 'belgium' && !s.isPaused && activeCadence > 10
+          ? Math.round(Math.sin(now * 0.045))
+          : 0;
       const bikeX = 96;
       const rearWheelX = bikeX - 15;
       const frontWheelX = bikeX + 17;
-      const wheelY = 109;
+      const wheelY = 109 + cobbleBounce;
       const wheelRot = worldX * 0.22;
 
       drawWheel(rearWheelX, wheelY, 10, wheelRot);
