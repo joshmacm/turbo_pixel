@@ -355,26 +355,27 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
     };
 
     const drawGirona = () => {
-      // Warm Mediterranean sky
+      // Crisp Catalan Mediterranean sky
       rect(0, 0, W, 32, '#0284c7');
       rect(0, 32, W, 34, '#38bdf8');
-      rect(0, 66, W, 32, '#fef08a');
-      rect(264, 12, 16, 16, '#fb923c');
-      rect(266, 14, 12, 12, '#fde047');
+      rect(0, 66, W, 32, '#bae6fd');
+      rect(264, 12, 16, 16, '#fde047');
+      rect(266, 14, 12, 12, '#fef08a');
       for (let i = 0; i < 3; i++) {
         const cx = ((i * 115 - cloudX) % (W + 40) + (W + 40)) % (W + 40) - 30;
         drawCloud(cx, 14 + (i % 2) * 12);
       }
 
-      // Pyrenees foothills (0.18x)
+      // Lush green Pyrenees foothills / Rocacorba (0.18x)
       const pyOff = (worldX * 0.18) % 100;
       for (let i = -1; i < 5; i++) {
         const mx = i * 100 - pyOff;
         for (let h = 0; h < 28; h += 2) {
           const span = (28 - h) * 3.0;
-          rect(mx + 50 - span / 2, 94 - h, span, 2, '#94a3b8');
+          rect(mx + 50 - span / 2, 94 - h, span, 2, h > 16 ? '#15803d' : '#16a34a');
         }
       }
+      rect(0, 92, W, 14, '#4d7c0f'); // Green riverbank & olive groves
 
       // Girona Onyar Riverfront & Cathedral (0.55x)
       const gOff = (worldX * 0.55) % 180;
@@ -635,6 +636,60 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
         }
       }
 
+      // Devon: occasional green tractor rolling down the road every ~2 minutes
+      if (s.scene === 'devon') {
+        const tCycle = (now % 120000) / 120000;
+        if (tCycle < 0.045) {
+          const tt = tCycle / 0.045;
+          const tx = W + 24 - tt * (W + 64); // Oncoming tractor rolling right-to-left
+          const ty = 113;
+          // Exhaust pipe & smoke puff
+          rect(tx + 8, ty - 10, 2, 5, '#334155');
+          if (Math.floor(now / 180) % 2 === 0) {
+            rect(tx + 9, ty - 14, 3, 2, '#cbd5e1');
+          }
+          // Cab & green bonnet
+          rect(tx + 12, ty - 14, 12, 10, '#16a34a');
+          rect(tx + 14, ty - 12, 8, 5, '#bae6fd'); // Cab glass
+          rect(tx + 2, ty - 8, 12, 6, '#15803d');  // Engine hood
+          rect(tx + 2, ty - 6, 10, 2, '#facc15');  // Yellow stripe
+          // Wheels (small front, big rear)
+          rect(tx + 3, ty - 2, 5, 5, '#0f172a');
+          rect(tx + 4, ty - 1, 3, 3, '#facc15');
+          rect(tx + 16, ty - 5, 9, 9, '#0f172a');
+          rect(tx + 18, ty - 3, 5, 5, '#facc15');
+        }
+      }
+
+      // Belgium: overtaken by Wout van Aert every ~6 minutes
+      if (s.scene === 'belgium') {
+        const wCycle = (now % 360000) / 360000;
+        if (wCycle < 0.014) {
+          const wt = wCycle / 0.014;
+          const wx = -36 + wt * (W + 72); // Zooming left-to-right past our rider
+          const wy = 112 + (Math.round(Math.sin(now * 0.05)) % 2);
+          // Wheels
+          drawWheel(wx - 12, wy, 8, now * 0.025);
+          drawWheel(wx + 12, wy, 8, now * 0.025);
+          // Bike frame
+          drawLinePixels(wx - 12, wy, wx, wy, '#facc15', 2);
+          drawLinePixels(wx, wy, wx - 4, wy - 11, '#facc15', 2);
+          drawLinePixels(wx - 4, wy - 11, wx + 9, wy - 12, '#facc15', 2);
+          drawLinePixels(wx + 9, wy - 12, wx + 12, wy, '#0f172a', 2);
+          // Visma yellow-and-black kit + Red Bull helmet
+          drawLinePixels(wx - 4, wy - 13, wx + 6, wy - 20, '#facc15', 4);
+          rect(wx + 5, wy - 26, 6, 4, '#1d4ed8'); // Helmet
+          rect(wx + 7, wy - 25, 3, 2, '#ef4444'); // Red Bull accent
+          // Speed lines + WOUT tag
+          rect(wx - 28, wy - 14, 10, 1, '#facc15');
+          rect(wx - 24, wy - 9, 8, 1, '#0f172a');
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 6px monospace';
+          ctx.fillText('WOUT!', Math.round(wx - 6), wy - 30);
+        }
+      }
+
+      // Zone badge top-left (now rendered as crisp HTML overlay below)
       rafId = requestAnimationFrame(frame);
     };
 

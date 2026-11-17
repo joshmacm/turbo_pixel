@@ -4,7 +4,7 @@ import {
   parseHeartRateMeasurement,
   parseIndoorBikeData,
 } from '../ble/parsers';
-import { computeRideStats, getActiveBlockAtTime } from '../workouts/engine';
+import { computeRideStats, estimateRampTestFtp, getActiveBlockAtTime } from '../workouts/engine';
 import { WORKOUT_LIBRARY } from '../workouts/library';
 import { generateTcx } from '../export/tcx';
 
@@ -80,5 +80,24 @@ describe('Workout Engine & TCX Export', () => {
     expect(tcx).toContain('<ns3:Watts>200</ns3:Watts>');
     expect(tcx).toContain('<Value>150</Value>');
     expect(tcx).toContain('<Cadence>90</Cadence>');
+  });
+
+  it('estimates FTP as 75% of best 60-second rolling average in ramp test', () => {
+    const samples = Array.from({ length: 180 }, (_, i) => {
+      // 60s @ 200W, 60s @ 300W, 60s @ 400W -> best 60s avg is 400W -> 75% = 300W
+      const watts = i < 60 ? 200 : i < 120 ? 300 : 400;
+      return {
+        timestampIso: new Date(1700000000000 + i * 1000).toISOString(),
+        elapsedSec: i + 1,
+        powerWatts: watts,
+        targetWatts: watts,
+        heartRateBpm: 165,
+        cadenceRpm: 90,
+        speedKmh: 35,
+        distanceMeters: (i + 1) * 10,
+      };
+    });
+    expect(estimateRampTestFtp(samples)).toBe(300);
+    expect(estimateRampTestFtp(samples.slice(0, 30))).toBeNull();
   });
 });
