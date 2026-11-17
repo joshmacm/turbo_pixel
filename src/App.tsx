@@ -25,6 +25,7 @@ import { WORKOUT_LIBRARY } from './workouts/library';
 import { computeRideStats, getActiveBlockAtTime, getBlockStartTime } from './workouts/engine';
 import { getZoneForPct } from './workouts/zones';
 import { playCountdownBeep } from './utils/audio';
+import { pickMotivationalMessage } from './utils/messages';
 import {
   deleteRideFromHistory,
   loadRideHistory,
@@ -79,6 +80,9 @@ export function App() {
   const [rideHistory, setRideHistory] = useState<SavedRide[]>(() => loadRideHistory());
   const [showBuilder, setShowBuilder] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [coachMessage, setCoachMessage] = useState<string>('');
+  const lastMsgBlockRef = useRef<number>(-1);
+  const lastMsgElapsedRef = useRef<number>(-99);
 
   // Device state
   const [trainerConnected, setTrainerConnected] = useState(false);
@@ -291,6 +295,26 @@ export function App() {
           playCountdownBeep(false);
         } else if (activeBlock.blockElapsedSec === 0 && elapsedSec > 0) {
           playCountdownBeep(true);
+        }
+      }
+
+      // Refresh coach message on block change, final 15s of hard efforts, or every 22s
+      if (activeBlock) {
+        const blockChanged = activeBlock.blockIndex !== lastMsgBlockRef.current;
+        const enteredFinal15 =
+          activeBlock.targetPct >= 0.95 &&
+          Math.round(activeBlock.blockRemainingSec) === 15;
+        const timedRefresh = elapsedSec - lastMsgElapsedRef.current >= 22;
+        if (blockChanged || enteredFinal15 || timedRefresh) {
+          lastMsgBlockRef.current = activeBlock.blockIndex;
+          lastMsgElapsedRef.current = elapsedSec;
+          setCoachMessage((prev) =>
+            pickMotivationalMessage(
+              activeBlock.targetPct,
+              activeBlock.blockRemainingSec,
+              prev
+            )
+          );
         }
       }
 
@@ -588,6 +612,7 @@ export function App() {
           isPaused={rideState !== 'running'}
           distanceMeters={distanceMetersRef.current}
           progress={rideProgress}
+          coachMessage={coachMessage}
         />
       </div>
 

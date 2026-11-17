@@ -22,6 +22,7 @@ interface PixelCanvasProps {
   isPaused: boolean;
   distanceMeters: number;
   progress?: number;
+  coachMessage?: string;
 }
 
 const W = 320;
@@ -36,6 +37,7 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
   isPaused,
   distanceMeters,
   progress = 0,
+  coachMessage,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stateRef = useRef({
@@ -789,6 +791,27 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
       >
         {currentZone.name.toUpperCase()}
       </div>
+
+      {coachMessage && !isPaused && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            maxWidth: '62%',
+            background: 'rgba(255, 255, 255, 0.92)',
+            border: '2px solid #0f172a',
+            boxShadow: '0 2px 0 #0f172a',
+            color: '#0f172a',
+            padding: '4px 9px',
+            fontSize: 11,
+            fontWeight: 700,
+            pointerEvents: 'none',
+          }}
+        >
+          {coachMessage}
+        </div>
+      )}
     </div>
   );
 };
