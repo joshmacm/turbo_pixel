@@ -577,21 +577,14 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
         }
       }
 
-      // Zone badge top-left
-      rect(6, 6, 62, 12, 'rgba(15, 23, 42, 0.85)');
-      ctx.strokeStyle = zone.color;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(6.5, 6.5, 61, 11);
-      ctx.fillStyle = zone.color;
-      ctx.font = 'bold 7px monospace';
-      ctx.fillText(zone.name.toUpperCase().slice(0, 10), 10, 14);
-
       rafId = requestAnimationFrame(frame);
     };
 
     rafId = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafId);
   }, []);
+
+  const currentZone = getZoneForPct(ftp > 0 ? powerWatts / ftp : 0);
 
   return (
     <div className="pixel-panel" style={{ overflow: 'hidden', position: 'relative' }}>
@@ -607,6 +600,23 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
           aspectRatio: `${W} / ${H}`,
         }}
       />
+      <div
+        style={{
+          position: 'absolute',
+          top: 10,
+          left: 10,
+          background: 'rgba(15, 23, 42, 0.88)',
+          border: `2px solid ${currentZone.color}`,
+          color: currentZone.color,
+          padding: '3px 8px',
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.04em',
+          pointerEvents: 'none',
+        }}
+      >
+        {currentZone.name.toUpperCase()}
+      </div>
     </div>
   );
 };
