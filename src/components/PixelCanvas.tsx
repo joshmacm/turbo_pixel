@@ -203,7 +203,7 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
       }
     };
 
-    const drawSwansea = () => {
+    const drawSwansea = (now: number) => {
       // Crisp coastal sky
       rect(0, 0, W, 34, '#0ea5e9');
       rect(0, 34, W, 32, '#38bdf8');
@@ -280,6 +280,26 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
         ctx.fillStyle = '#0284c7';
         ctx.font = 'bold 5px monospace';
         ctx.fillText('RIPPLES', Math.round(rx + 8), 87);
+
+        // Once every ~5 minutes, a man pops out of Ripples and waves!
+        const rWaveCycle = (now % 300000) / 300000;
+        if (rWaveCycle < 0.018) {
+          const mx = rx + 26;
+          const my = 96;
+          const waveUp = Math.floor(now / 180) % 2 === 0;
+          rect(mx, my + 3, 4, 5, '#0284c7'); // Blue shirt/apron
+          rect(mx + 1, my + 4, 2, 4, '#ffffff'); // White apron
+          rect(mx + 1, my, 3, 3, '#f1c27d'); // Head
+          // Waving arm
+          if (waveUp) {
+            rect(mx + 4, my - 1, 2, 3, '#f1c27d');
+          } else {
+            rect(mx + 4, my + 2, 2, 2, '#f1c27d');
+          }
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 5px monospace';
+          ctx.fillText('HI!', Math.round(mx - 1), my - 3);
+        }
       }
 
       const postOff = (worldX * 0.7) % 48;
@@ -558,7 +578,7 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
 
       // Draw selected scene
       if (s.scene === 'bristol') drawBristol();
-      else if (s.scene === 'swansea') drawSwansea();
+      else if (s.scene === 'swansea') drawSwansea(now);
       else if (s.scene === 'brecon') drawBrecon();
       else if (s.scene === 'devon') drawDevon();
       else if (s.scene === 'belgium') drawBelgium();
