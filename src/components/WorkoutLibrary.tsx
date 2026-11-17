@@ -22,6 +22,7 @@ const CATEGORIES: ('All' | WorkoutCategory)[] = [
   'Threshold',
   'VO2 Max',
   'Sprint',
+  'AI Generated',
   'Custom',
 ];
 
@@ -181,7 +182,7 @@ export const WorkoutLibrary: React.FC<WorkoutLibraryProps> = ({
                     >
                       {w.category}
                     </span>
-                    {w.category === 'Custom' && onDeleteCustom && (
+                    {(w.category === 'Custom' || w.category === 'AI Generated') && onDeleteCustom && (
                       <button
                         className="pixel-btn"
                         style={{ padding: '2px 4px', boxShadow: 'none' }}

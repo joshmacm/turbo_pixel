@@ -880,8 +880,9 @@ export function App() {
         <AiWorkoutModal
           ftp={ftp}
           onSelectAndSave={(w) => {
-            setCustomWorkouts((prev) => [w, ...prev]);
-            handleSelectWorkout(w);
+            const tagged: Workout = { ...w, category: 'AI Generated' };
+            setCustomWorkouts((prev) => [tagged, ...prev]);
+            handleSelectWorkout(tagged);
             setShowAiModal(false);
           }}
           onClose={() => setShowAiModal(false)}

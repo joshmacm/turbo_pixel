@@ -116,6 +116,7 @@ export function generateWorkoutsFromPrompt(prompt: string): Workout[] {
       'VO2 Max': [1.15, 1.20],
       Sprint: [1.55, 1.75],
       Custom: [0.88, 0.92],
+      'AI Generated': [0.88, 0.92],
     };
     const [lowPct, highPct] = pctByFocus[focus];
 

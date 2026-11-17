@@ -10,7 +10,14 @@ export interface WorkoutBlock {
   cadenceTarget?: number;
 }
 
-export type WorkoutCategory = 'Endurance' | 'Sweet Spot' | 'Threshold' | 'VO2 Max' | 'Sprint' | 'Custom';
+export type WorkoutCategory =
+  | 'Endurance'
+  | 'Sweet Spot'
+  | 'Threshold'
+  | 'VO2 Max'
+  | 'Sprint'
+  | 'Custom'
+  | 'AI Generated';
 
 export interface Workout {
   id: string;
