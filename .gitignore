@@ -1,0 +1,5 @@
+node_modules
+dist
+.strava-config.json
+.strava-tokens.json
+.DS_Store

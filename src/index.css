@@ -1,0 +1,143 @@
+:root {
+  --bg: #dff0ff;
+  --surface: #f7fbff;
+  --panel: #ffffff;
+  --panel-alt: #e8f2fc;
+  --border: #94a9c4;
+  --border-bright: #4b6587;
+  --text: #0f172a;
+  --muted: #475569;
+  --accent: #0284c7;
+  --green: #16a34a;
+  --yellow: #ca8a04;
+  --orange: #ea580c;
+  --red: #dc2626;
+  --shadow: #b8cde3;
+  --font-pixel: 'Press Start 2P', monospace;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #cce7ff 0%, #eaf5ff 100%);
+  min-height: 100vh;
+  color: var(--text);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+}
+
+.pixel-font {
+  font-family: var(--font-pixel);
+  letter-spacing: 0.03em;
+}
+
+.pixel-panel {
+  background: var(--panel);
+  border: 2px solid var(--border-bright);
+  box-shadow: 0 4px 0 var(--shadow);
+}
+
+.pixel-btn {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 8px 12px;
+  background: var(--panel-alt);
+  color: var(--text);
+  border: 2px solid var(--border-bright);
+  box-shadow: 0 3px 0 var(--shadow);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.05s ease, background 0.12s ease;
+}
+
+.pixel-btn:hover:not(:disabled) {
+  background: #d6e8fa;
+}
+
+.pixel-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--shadow);
+}
+
+.pixel-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pixel-btn-primary {
+  background: #0284c7;
+  border-color: #0369a1;
+  color: #ffffff;
+}
+
+.pixel-btn-primary:hover:not(:disabled) {
+  background: #0369a1;
+}
+
+.pixel-btn-success {
+  background: #16a34a;
+  border-color: #15803d;
+  color: #ffffff;
+}
+
+.pixel-btn-success:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.pixel-btn-danger {
+  background: #dc2626;
+  border-color: #b91c1c;
+  color: #ffffff;
+}
+
+.pixel-btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.pixel-btn-strava {
+  background: #ea580c;
+  border-color: #c2410c;
+  color: #ffffff;
+}
+
+.pixel-btn-strava:hover:not(:disabled) {
+  background: #c2410c;
+}
+
+.pixel-input {
+  background: var(--surface);
+  border: 2px solid var(--border-bright);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 6px 10px;
+  outline: none;
+}
+
+.pixel-input:focus {
+  border-color: var(--accent);
+}
+
+canvas.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
