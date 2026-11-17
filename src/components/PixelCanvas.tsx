@@ -232,6 +232,14 @@ export const PixelCanvas: React.FC<PixelCanvasProps> = ({
       rect(ptX + 5, 61, 5, 3, '#f1f5f9');
       rect(ptX + 23, 57, 8, 4, '#ffffff');
       rect(ptX + 33, 62, 6, 3, '#e2e8f0');
+      // Occasional flare stack flame shooting from Port Talbot every ~3 minutes
+      const flareCycle = (now % 180000) / 180000;
+      if (flareCycle < 0.02) {
+        const flicker = Math.floor(now / 90) % 2;
+        rect(ptX + 21, 51 - flicker * 2, 5, 11 + flicker * 2, '#ea580c'); // Outer orange flame
+        rect(ptX + 22, 54 - flicker, 3, 8 + flicker, '#facc15'); // Inner yellow core
+        rect(ptX + 23, 47 - flicker * 3, 2, 4, '#fb923c'); // Flame tip
+      }
 
       // Mumbles Headland & Lighthouse connected to the shore (parallax 0.14x)
       const mOff = (worldX * 0.14) % 380;
