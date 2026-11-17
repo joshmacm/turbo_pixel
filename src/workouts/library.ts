@@ -240,6 +240,20 @@ export const WORKOUT_LIBRARY: Workout[] = [
     ]
   ),
   makeWorkout(
+    'sweet-spot-3x10',
+    '50m Sweet Spot 3x10',
+    'Sweet Spot',
+    'Three 10-minute blocks climbing from 88% to 93% FTP with 3-minute easy spins.',
+    [
+      { name: 'Warmup', type: 'warmup', durationSec: 420, startPowerPct: 0.48, endPowerPct: 0.76, cadenceTarget: 90 },
+      ...repeatBlocks(3, [
+        { name: 'Sweet Spot', type: 'steady', durationSec: 600, startPowerPct: 0.88, endPowerPct: 0.93, cadenceTarget: 90 },
+        { name: 'Recovery', type: 'recovery', durationSec: 180, startPowerPct: 0.54, endPowerPct: 0.54, cadenceTarget: 85 },
+      ]),
+      { name: 'Cooldown', type: 'cooldown', durationSec: 240, startPowerPct: 0.60, endPowerPct: 0.40, cadenceTarget: 84 },
+    ]
+  ),
+  makeWorkout(
     'endurance-torque-90',
     '90m Base & Torque',
     'Endurance',
